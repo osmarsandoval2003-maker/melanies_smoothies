@@ -28,8 +28,18 @@ ingredient_list = st.multiselect(
 
 # If ingredients are selected
 if ingredient_list:
-    ingredients_string = " ".join(ingredient_list)
+    ingredients_string = ", ".join(ingredient_list)
     st.write("Your selected ingredients:", ingredients_string)
+
+    # Show nutrition info for each fruit
+    for fruit_chosen in ingredient_list:
+        st.subheader(f"{fruit_chosen} Nutrition Information")
+        try:
+            response = requests.get(f"https://www.smoothiefroot.com/api/fruit/{fruit_chosen}")
+            response.raise_for_status()
+            st.dataframe(data=response.json(), use_container_width=True)
+        except requests.exceptions.RequestException as e:
+            st.error(f"Could not retrieve data for {fruit_chosen}: {e}")
 
     # Prepare SQL insert statement
     my_insert_stmt = f"""
@@ -45,6 +55,4 @@ if ingredient_list:
         session.sql(my_insert_stmt).collect()
         st.success(f"Your Smoothie is ordered, {name_on_order}! ✅")
 
-smoothiefroot_response = requests.get("https://my.smoothiefroot.com/api/fruit/watermelon")
-sf_df = st.dataframe(data=smoothiefroot_response.json(), use_container_width=True)
 
