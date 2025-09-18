@@ -1,69 +1,46 @@
-# Import Python packages
+# Import python packages
 import streamlit as st
+from snowflake.snowpark.context import get_active_session
 from snowflake.snowpark.functions import col
-import pandas as pd
-import requests
 
-# App title and instructions
-st.set_page_config(page_title="Customize Your Smoothie", page_icon="🥤")
-st.title("🥤 Customize Your Smoothie!")
-st.write("Choose the fruits you want in your custom Smoothie!")
-
-# Input: Name on the smoothie
-name_on_order = st.text_input("Name on Smoothie:")
-if name_on_order:
-    st.markdown(f"### 🧃 Your Smoothie will be called: **{name_on_order}**")
-
-# Connect to Snowflake
-cnx = st.connection("snowflake")
-session = cnx.session()
-
-# Fetch fruit options from Snowflake
-my_dataframe = session.table("smoothies.public.fruit_options").select(col("FRUIT_NAME"))
-fruit_list = [row["FRUIT_NAME"] for row in my_dataframe.collect()]
-
-# Ingredient selection
-ingredient_list = st.multiselect(
-    "Choose up to 5 ingredients",
-    fruit_list,
-    max_selections=5
+# Write directly to the app
+st.title(f" :cup_with_straw: Customize Your Smoothie! :cup_with_straw:")
+st.write(
+  """Choose the fruits you want in your custom Smoothie!
+  """
 )
 
-# If ingredients are selected
+name_on_order=st.text_input('Name on Smoothie:')
+st.write('The name on your Smoothie will be:', name_on_order)
+
+session = get_active_session()
+my_dataframe = session.table("smoothies.public.fruit_options").select(col('FRUIT_NAME'))
+#st.dataframe(data=my_dataframe, use_container_width=True)
+
+ingredient_list=st.multiselect(
+    'Choose up to 5 ingredients'
+    , my_dataframe
+    , max_selections=5
+)
 if ingredient_list:
-    ingredients_string = ", ".join(ingredient_list)
-    st.write("🍍 Your selected ingredients:", " | ".join([f"🥝 {fruit}" for fruit in ingredient_list]))
 
-    # Show nutrition info for each fruit
-    for fruit_chosen in ingredient_list:
-        st.subheader(f"{fruit_chosen} Nutrition Information")
-        try:
-            response = requests.get(f"https://www.smoothiefroot.com/api/fruit/{fruit_chosen}")
-            response.raise_for_status()
-            data = response.json()
-            if isinstance(data, dict):
-                data = [data]
-            df = pd.DataFrame(data)[["name", "id", "carbohydrates", "protein", "fat", "calories", "sugar"]]
-            st.dataframe(df, use_container_width=True)
-        except requests.exceptions.RequestException:
-            st.warning(f"⚠️ {fruit_chosen} is not in the Fruityvice database.")
+    ingredients_string=''
 
-    # Prepare SQL insert statement
-    my_insert_stmt = f"""
-        INSERT INTO smoothies.public.orders(ingredients, name_on_order)
-        VALUES ('{ingredients_string}', '{name_on_order}')
-    """
+    for fruit_chosen in  ingredient_list:
+        ingredients_string += fruit_chosen + ' '
+        
+    st.write(ingredients_string)
 
-    # Submit button
-    time_to_insert = st.button("Submit Order")
+    my_insert_stmt = """ insert into smoothies.public.orders(ingredients, name_on_order)
+            values ('""" + ingredients_string + """','"""+ name_on_order +"""')"""
 
-    # If button is clicked, insert order
-    if time_to_insert:
-        if not name_on_order:
-            st.error("Please enter a name for your smoothie.")
-        else:
-            session.sql(my_insert_stmt).collect()
-            st.success(f"Your Smoothie is ordered, {name_on_order}! ✅")
+    #st.write(my_insert_stmt)
+    #st.stop()
+    time_to_insert=st.button('Submit Order')
+
+if time_to_insert:
+    session.sql(my_insert_stmt).collect()
+    st.success('Your Smoothie is ordered! ', icon="✅")
 
 
 
